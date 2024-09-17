@@ -1,7 +1,9 @@
 import { build } from "esbuild";
 import { ViteDevServer } from "vite";
-import { Miniflare } from "miniflare";
+import { Miniflare, mergeWorkerOptions, MiniflareOptions } from "miniflare";
 import path from "path";
+import { unstable_getMiniflareWorkerOptions } from "wrangler";
+import fs from "fs";
 
 async function getTransformedCode(modulePath: string) {
   const result = await build({
@@ -17,8 +19,10 @@ async function getTransformedCode(modulePath: string) {
 export const createMiniflare = async (viteDevServer: ViteDevServer) => {
   const modulePath = path.resolve(__dirname, "miniflare_module.ts");
   const code = await getTransformedCode(modulePath);
-
-  const miniflare = new Miniflare({
+  const config = fs.existsSync("wrangler.toml")
+    ? unstable_getMiniflareWorkerOptions("wrangler.toml")
+    : { workerOptions: {} };
+  const miniflareOption: MiniflareOptions = {
     compatibilityDate: "2024-08-21",
     modulesRoot: "/",
     modules: [
@@ -40,6 +44,20 @@ export const createMiniflare = async (viteDevServer: ViteDevServer) => {
         return new Response(JSON.stringify(result));
       },
     },
+  };
+  if (
+    "compatibilityDate" in config.workerOptions &&
+    !config.workerOptions.compatibilityDate
+  ) {
+    delete config.workerOptions.compatibilityDate;
+  }
+  const options = mergeWorkerOptions(
+    miniflareOption,
+    config.workerOptions as WorkerOptions
+  ) as MiniflareOptions;
+
+  const miniflare = new Miniflare({
+    ...options,
   });
   return miniflare;
 };

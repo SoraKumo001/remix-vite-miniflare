@@ -4,6 +4,7 @@ import path from "path";
 import { Connect, Plugin as VitePlugin } from "vite";
 import type { ServerResponse } from "node:http";
 import { createMiniflare } from "./miniflare";
+
 import {
   Response as MiniflareResponse,
   Request as MiniflareRequest,
@@ -14,7 +15,10 @@ export function devServer(): VitePlugin {
   const plugin: VitePlugin = {
     name: "edge-dev-server",
     configureServer: async (viteDevServer) => {
-      const runner = createMiniflare(viteDevServer);
+      const runner = await createMiniflare(viteDevServer);
+      process.on("exit", () => {
+        runner.dispose();
+      });
       return () => {
         if (!viteDevServer.config.server.middlewareMode) {
           viteDevServer.middlewares.use(async (req, nodeRes, next) => {
@@ -24,7 +28,7 @@ export function devServer(): VitePlugin {
                 "x-vite-entry",
                 path.resolve(__dirname, "server.ts")
               );
-              const response = await (await runner).dispatchFetch(request);
+              const response = await runner.dispatchFetch(request);
               await toResponse(response, nodeRes);
             } catch (error) {
               next(error);
