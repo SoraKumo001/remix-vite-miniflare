@@ -4,7 +4,7 @@ import {
   ssrModuleExportsKey,
 } from "vite/module-runner";
 
-export type RunnerEnv = {
+type RunnerEnv = {
   __viteUnsafeEval: {
     eval: (
       code: string,
@@ -46,7 +46,10 @@ class WorkerdModuleRunner extends ModuleRunner {
           Object.freeze(context[ssrModuleExportsKey]);
         },
         async runExternalModule(filepath) {
-          return import(filepath);
+          const result = await import(filepath).catch((e) => {
+            console.error(e);
+          });
+          return { ...result, ...result.default };
         },
       }
     );

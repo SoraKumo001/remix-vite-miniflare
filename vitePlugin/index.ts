@@ -41,18 +41,7 @@ export function devServer(): VitePlugin {
     config: () => {
       return {
         ssr: {
-          noExternal: true,
           target: "webworker",
-          optimizeDeps: {
-            include: [
-              "react",
-              "react/jsx-dev-runtime",
-              "react-dom",
-              "react-dom/server",
-              "@remix-run/server-runtime",
-              "@remix-run/cloudflare",
-            ],
-          },
         },
       };
     },

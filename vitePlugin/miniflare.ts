@@ -1,9 +1,16 @@
+import { fileURLToPath } from "url";
 import { build } from "esbuild";
 import { ViteDevServer } from "vite";
-import { Miniflare, mergeWorkerOptions, MiniflareOptions } from "miniflare";
+import {
+  Miniflare,
+  mergeWorkerOptions,
+  MiniflareOptions,
+  Response,
+} from "miniflare";
 import path from "path";
 import { unstable_getMiniflareWorkerOptions } from "wrangler";
 import fs from "fs";
+import { unsafeModuleFallbackService } from "./unsafeModuleFallbackService";
 
 async function getTransformedCode(modulePath: string) {
   const result = await build({
@@ -22,9 +29,11 @@ export const createMiniflare = async (viteDevServer: ViteDevServer) => {
   const config = fs.existsSync("wrangler.toml")
     ? unstable_getMiniflareWorkerOptions("wrangler.toml")
     : { workerOptions: {} };
+
   const miniflareOption: MiniflareOptions = {
     compatibilityDate: "2024-08-21",
-    modulesRoot: "/",
+    compatibilityFlags: ["nodejs_compat"],
+    modulesRoot: fileURLToPath(new URL("./", import.meta.url)),
     modules: [
       {
         path: modulePath,
@@ -32,6 +41,9 @@ export const createMiniflare = async (viteDevServer: ViteDevServer) => {
         contents: code,
       },
     ],
+    unsafeUseModuleFallbackService: true,
+    unsafeModuleFallbackService: (request) =>
+      unsafeModuleFallbackService(viteDevServer, request),
     unsafeEvalBinding: "__viteUnsafeEval",
     serviceBindings: {
       __viteFetchModule: async (request) => {
@@ -55,9 +67,6 @@ export const createMiniflare = async (viteDevServer: ViteDevServer) => {
     miniflareOption,
     config.workerOptions as WorkerOptions
   ) as MiniflareOptions;
-
-  const miniflare = new Miniflare({
-    ...options,
-  });
+  const miniflare = new Miniflare(options);
   return miniflare;
 };
